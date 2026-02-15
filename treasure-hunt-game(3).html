@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Охота за сокровищами</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #667eea, #764ba2); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .game-container { max-width: 900px; width: 100%; background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; }
+        .game-header { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 30px; text-align: center; }
+        .game-header h1 { font-size: 2em; margin-bottom: 10px; }
+        .game-content { padding: 40px; }
+        
+        /* Стили загрузки */
+        .loading-screen { text-align: center; padding: 60px 20px; }
+        .loading-spinner { border: 8px solid #f3f3f3; border-top: 8px solid #667eea; border-radius: 50%; width: 80px; height: 80px; animation: spin 1s linear infinite; margin: 0 auto 30px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loading-text { font-size: 1.5em; color: #667eea; font-weight: bold; }
+        
+        /* Стили ошибки */
+        .error-screen { text-align: center; padding: 40px 20px; }
+        .error-icon { font-size: 5em; margin-bottom: 20px; }
+        .error-title { font-size: 1.8em; color: #dc3545; font-weight: bold; margin-bottom: 20px; }
+        .error-message { font-size: 1.1em; color: #666; margin-bottom: 30px; }
+        
+        /* Стили карты */
+        .map-view { position: relative; width: 100%; height: 500px; border: 5px solid #8b4513; border-radius: 15px; overflow: hidden; background-size: cover; background-position: center; margin-bottom: 30px; }
+        .map-view.pirates { background: linear-gradient(135deg, rgba(212,165,116,0.9), rgba(196,154,108,0.9)); }
+        .map-view.jungle { background: linear-gradient(135deg, rgba(168,213,186,0.9), rgba(124,179,66,0.9)); }
+        .map-view.underwater { background: linear-gradient(135deg, rgba(179,229,252,0.9), rgba(79,195,247,0.9)); }
+        .map-view.space { background: linear-gradient(135deg, rgba(15,52,96,0.95), rgba(26,26,46,0.95)); }
+        .map-view.city { background: linear-gradient(135deg, rgba(224,224,224,0.95), rgba(189,189,189,0.95)); }
+        
+        .map-point { position: absolute; font-size: 50px; transform: translate(-50%, -100%); filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4)); cursor: pointer; transition: transform 0.3s; user-select: none; }
+        .map-point:hover { transform: translate(-50%, -100%) scale(1.2); }
+        .map-point.completed { opacity: 0.5; filter: grayscale(100%); }
+        .map-point.active { animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { transform: translate(-50%, -100%) scale(1); } 50% { transform: translate(-50%, -100%) scale(1.3); } }
+        
+        .point-label { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); background: white; color: #667eea; border: 3px solid #667eea; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
+        
+        /* Стили вопросов */
+        .question-view { display: none; }
+        .question-view.active { display: block; }
+        .question-text { font-size: 1.5em; margin-bottom: 20px; color: #333; font-weight: bold; }
+        .question-image { max-width: 100%; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        
+        .answers { display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; }
+        .answer-btn { padding: 20px; border: 3px solid #ddd; border-radius: 12px; background: white; font-size: 1.1em; cursor: pointer; transition: all 0.3s; text-align: left; font-family: inherit; width: 100%; }
+        .answer-btn:hover { background: #f0f4ff; border-color: #667eea; transform: translateX(10px); }
+        .answer-btn.correct { background: #d4edda; border-color: #28a745; pointer-events: none; }
+        .answer-btn.wrong { background: #f8d7da; border-color: #dc3545; }
+        .answer-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+        
+        .answer-image { max-width: 200px; border-radius: 8px; margin-top: 10px; display: block; }
+        
+        .text-input { width: 100%; padding: 15px; border: 3px solid #ddd; border-radius: 12px; font-size: 1.1em; font-family: inherit; margin-bottom: 15px; }
+        .text-input:focus { outline: none; border-color: #667eea; }
+        
+        .submit-btn { padding: 15px 40px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 12px; font-size: 1.1em; font-weight: bold; cursor: pointer; transition: all 0.3s; }
+        .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
+        .submit-btn:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+        
+        /* Сообщения */
+        .message { padding: 20px; border-radius: 12px; margin: 20px 0; text-align: center; font-size: 1.2em; font-weight: bold; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .message.correct { background: #d4edda; color: #155724; border: 3px solid #28a745; }
+        .message.wrong { background: #f8d7da; color: #721c24; border: 3px solid #dc3545; }
+        
+        /* Финальный экран */
+        .final-message { text-align: center; font-size: 2em; color: #667eea; font-weight: bold; padding: 40px; animation: celebration 1s; }
+        @keyframes celebration { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
+        
+        /* Прогресс */
+        .progress { background: #e9ecef; height: 30px; border-radius: 15px; overflow: hidden; margin-bottom: 30px; }
+        .progress-bar { height: 100%; background: linear-gradient(135deg, #56ab2f, #a8e063); transition: width 0.5s; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 0.9em; }
+        
+        /* Кнопка возврата к карте */
+        .back-btn { padding: 10px 25px; background: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; margin-bottom: 20px; font-size: 1em; }
+        .back-btn:hover { background: #5a6268; }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1 id="gameTitle">🗺️ Охота за сокровищами 💎</h1>
+        </div>
+        <div class="game-content">
+            <!-- Экран загрузки -->
+            <div id="loadingScreen" class="loading-screen">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">Загружаем вашу игру...</div>
+            </div>
+            
+            <!-- Экран ошибки -->
+            <div id="errorScreen" class="error-screen" style="display: none;">
+                <div class="error-icon">😔</div>
+                <div class="error-title">Игра не найдена</div>
+                <div class="error-message">Возможно, ссылка неверная или игра была удалена.</div>
+                <div class="error-message" id="errorDetails"></div>
+            </div>
+            
+            <!-- Игровой контент -->
+            <div id="gameContent" style="display: none;">
+                <div class="progress">
+                    <div class="progress-bar" id="progressBar">0%</div>
+                </div>
+                
+                <div id="mapView" class="map-view"></div>
+                
+                <div id="questionView" class="question-view">
+                    <button class="back-btn" id="backToMapBtn" onclick="backToMap()">← Вернуться к карте</button>
+                    <div id="questionContent"></div>
+                </div>
+                
+                <div id="finalView" style="display: none;">
+                    <div class="final-message" id="finalMessage"></div>
+                    <div style="text-align: center; margin-top: 30px;">
+                        <button class="submit-btn" onclick="restartGame()">🔄 Начать заново</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // ЗАГРУЗКА КОНФИГУРАЦИИ ИГРЫ
+        // ========================================
+        
+        // Получаем ID игры из URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const gameId = urlParams.get('id');
+        
+        // Глобальные переменные
+        let gameConfig = null;
+        let currentQuestion = 0;
+        let completedQuestions = [];
+        
+        // Темы игры
+        const themes = {
+            pirates: { icon: '🏴‍☠️', name: 'Пираты', markerIcon: '🏴‍☠️', treasureIcon: '💎' },
+            jungle: { icon: '🌴', name: 'Джунгли', markerIcon: '🗿', treasureIcon: '💎' },
+            underwater: { icon: '🌊', name: 'Подводный мир', markerIcon: '🐚', treasureIcon: '🔱' },
+            space: { icon: '🚀', name: 'Космос', markerIcon: '🛸', treasureIcon: '🌟' },
+            city: { icon: '🏙️', name: 'Город', markerIcon: '🏛️', treasureIcon: '👑' }
+        };
+        
+        // Загрузка игры при старте
+        window.addEventListener('DOMContentLoaded', function() {
+            if (!gameId) {
+                showError('ID игры не указан в URL', 'Убедитесь, что вы перешли по правильной ссылке.');
+                return;
+            }
+            
+            loadGameConfig();
+        });
+        
+        function loadGameConfig() {
+            // ВАЖНО: Используем обратные кавычки для работы ${gameId}
+            const configUrl = `https://rusinovanatali24-jpg.github.io/texts/data/${gameId}.json`;
+            
+            fetch(configUrl)
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(function(config) {
+                    gameConfig = config;
+                    initGame();
+                })
+                .catch(function(error) {
+                    console.error('Ошибка загрузки конфигурации:', error);
+                    showError('Не удалось загрузить игру', 'Ошибка: ' + error.message);
+                });
+        }
+        
+        function showError(title, details) {
+            document.getElementById('loadingScreen').style.display = 'none';
+            document.getElementById('errorScreen').style.display = 'block';
+            document.querySelector('.error-title').textContent = title;
+            document.getElementById('errorDetails').textContent = details;
+        }
+        
+        // ========================================
+        // ИНИЦИАЛИЗАЦИЯ И УПРАВЛЕНИЕ ИГРОЙ
+        // ========================================
+        
+        function initGame() {
+            document.getElementById('loadingScreen').style.display = 'none';
+            document.getElementById('gameContent').style.display = 'block';
+            
+            // Установка заголовка
+            const themeData = themes[gameConfig.theme];
+            document.getElementById('gameTitle').textContent = `${themeData.icon} ${gameConfig.title} ${themeData.treasureIcon}`;
+            
+            // Отрисовка карты
+            renderMap();
+            updateProgress();
+        }
+        
+        function renderMap() {
+            const mapView = document.getElementById('mapView');
+            mapView.className = 'map-view ' + gameConfig.theme;
+            
+            // Установка фона карты
+            if (gameConfig.selectedMap === 'custom' && gameConfig.customMapUrl) {
+                mapView.style.backgroundImage = `url(${gameConfig.customMapUrl})`;
+            }
+            
+            // Очистка карты
+            mapView.innerHTML = '';
+            
+            const themeData = themes[gameConfig.theme];
+            
+            // Добавление точек на карту
+            gameConfig.mapPoints.forEach(function(point, index) {
+                const pointDiv = document.createElement('div');
+                pointDiv.className = 'map-point';
+                
+                // Добавление классов состояния
+                if (completedQuestions.includes(index)) {
+                    pointDiv.classList.add('completed');
+                } else if (index === currentQuestion) {
+                    pointDiv.classList.add('active');
+                }
+                
+                pointDiv.style.left = point.x + '%';
+                pointDiv.style.top = point.y + '%';
+                
+                // Определение иконки (последняя точка = сокровище)
+                const isLast = index === gameConfig.mapPoints.length - 1;
+                const icon = isLast ? themeData.treasureIcon : themeData.markerIcon;
+                
+                pointDiv.innerHTML = `${icon}<div class="point-label">${index + 1}</div>`;
+                
+                // Обработчик клика
+                pointDiv.addEventListener('click', function() {
+                    if (index === currentQuestion && !completedQuestions.includes(index)) {
+                        showQuestion(index);
+                    }
+                });
+                
+                mapView.appendChild(pointDiv);
+            });
+        }
+        
+        function showQuestion(index) {
+            const question = gameConfig.questions[index];
+            
+            // Если вопроса нет - автоматически переходим дальше
+            if (!question) {
+                completedQuestions.push(index);
+                currentQuestion++;
+                if (currentQuestion >= gameConfig.mapPoints.length) {
+                    showFinal();
+                } else {
+                    renderMap();
+                    updateProgress();
+                }
+                return;
+            }
+            
+            // Скрываем карту, показываем вопрос
+            document.getElementById('mapView').style.display = 'none';
+            document.getElementById('questionView').style.display = 'block';
+            
+            const questionContent = document.getElementById('questionContent');
+            let html = `<div class="question-text">${question.text}</div>`;
+            
+            // Изображение к вопросу
+            if (question.useQuestionImage && question.questionImageUrl) {
+                html += `<img src="${question.questionImageUrl}" class="question-image" alt="Изображение вопроса">`;
+            }
+            
+            // Варианты ответов в зависимости от типа вопроса
+            if (question.type === 'noAnswer') {
+                html += '<button class="submit-btn" onclick="handleNoAnswer()">Продолжить</button>';
+            } else if (question.type === 'text') {
+                html += '<input type="text" class="text-input" id="textAnswer" placeholder="Введите ответ">';
+                html += '<button class="submit-btn" onclick="checkTextAnswer()">Проверить</button>';
+            } else {
+                html += '<div class="answers" id="answersContainer">';
+                question.answers.forEach(function(answer, aIndex) {
+                    html += `<button class="answer-btn" data-index="${aIndex}" onclick="checkAnswer(${aIndex})">`;
+                    html += answer.text;
+                    
+                    // Изображение для ответа (если тип imageAnswers)
+                    if (question.type === 'imageAnswers' && answer.hasImage && answer.imageUrl) {
+                        html += `<br><img src="${answer.imageUrl}" class="answer-image" alt="Изображение ответа">`;
+                    }
+                    
+                    html += '</button>';
+                });
+                html += '</div>';
+            }
+            
+            html += '<div id="messageContainer"></div>';
+            
+            questionContent.innerHTML = html;
+        }
+        
+        function backToMap() {
+            document.getElementById('questionView').style.display = 'none';
+            document.getElementById('mapView').style.display = 'block';
+        }
+        
+        function checkAnswer(answerIndex) {
+            const question = gameConfig.questions[currentQuestion];
+            const answer = question.answers[answerIndex];
+            const buttons = document.querySelectorAll('.answer-btn');
+            
+            // Блокируем все кнопки
+            buttons.forEach(btn => btn.disabled = true);
+            
+            if (answer.correct) {
+                buttons[answerIndex].classList.add('correct');
+                showMessage(gameConfig.correctText, 'correct');
+                if (gameConfig.soundEnabled) playSound('correct');
+                setTimeout(nextQuestion, 2000);
+            } else {
+                buttons[answerIndex].classList.add('wrong');
+                showMessage(gameConfig.wrongText, 'wrong');
+                if (gameConfig.soundEnabled) playSound('wrong');
+                
+                // Разблокируем кнопки через 1.5 секунды
+                setTimeout(function() {
+                    buttons.forEach(btn => btn.disabled = false);
+                    document.getElementById('messageContainer').innerHTML = '';
+                }, 1500);
+            }
+        }
+        
+        function checkTextAnswer() {
+            const userAnswer = document.getElementById('textAnswer').value.trim().toLowerCase();
+            const question = gameConfig.questions[currentQuestion];
+            const correctAnswer = (question.correctText || '').trim().toLowerCase();
+            
+            if (userAnswer === correctAnswer) {
+                showMessage(gameConfig.correctText, 'correct');
+                if (gameConfig.soundEnabled) playSound('correct');
+                setTimeout(nextQuestion, 2000);
+            } else {
+                showMessage(gameConfig.wrongText, 'wrong');
+                if (gameConfig.soundEnabled) playSound('wrong');
+            }
+        }
+        
+        function handleNoAnswer() {
+            showMessage(gameConfig.correctText, 'correct');
+            if (gameConfig.soundEnabled) playSound('correct');
+            setTimeout(nextQuestion, 1500);
+        }
+        
+        function showMessage(text, type) {
+            const messageContainer = document.getElementById('messageContainer');
+            messageContainer.innerHTML = `<div class="message ${type}">${text}</div>`;
+        }
+        
+        function nextQuestion() {
+            completedQuestions.push(currentQuestion);
+            currentQuestion++;
+            updateProgress();
+            
+            if (currentQuestion >= gameConfig.mapPoints.length) {
+                showFinal();
+            } else {
+                document.getElementById('questionView').style.display = 'none';
+                document.getElementById('mapView').style.display = 'block';
+                renderMap();
+            }
+        }
+        
+        function updateProgress() {
+            const progress = (completedQuestions.length / gameConfig.mapPoints.length) * 100;
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = progress + '%';
+            progressBar.textContent = Math.round(progress) + '%';
+        }
+        
+        function showFinal() {
+            document.getElementById('mapView').style.display = 'none';
+            document.getElementById('questionView').style.display = 'none';
+            document.getElementById('finalView').style.display = 'block';
+            document.getElementById('finalMessage').textContent = gameConfig.finalText;
+            
+            if (gameConfig.soundEnabled) playSound('final');
+            
+            // Конфетти или другие эффекты можно добавить здесь
+            createConfetti();
+        }
+        
+        function restartGame() {
+            currentQuestion = 0;
+            completedQuestions = [];
+            document.getElementById('finalView').style.display = 'none';
+            document.getElementById('mapView').style.display = 'block';
+            renderMap();
+            updateProgress();
+        }
+        
+        function playSound(type) {
+            // Звуковые эффекты можно добавить позже
+            // Используя Web Audio API или готовые звуки
+        }
+        
+        function createConfetti() {
+            // Простой эффект конфетти
+            const colors = ['#667eea', '#764ba2', '#56ab2f', '#a8e063', '#f093fb', '#f5576c'];
+            const confettiCount = 50;
+            
+            for (let i = 0; i < confettiCount; i++) {
+                const confetti = document.createElement('div');
+                confetti.style.position = 'fixed';
+                confetti.style.width = '10px';
+                confetti.style.height = '10px';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.top = '-10px';
+                confetti.style.opacity = '1';
+                confetti.style.borderRadius = '50%';
+                confetti.style.pointerEvents = 'none';
+                confetti.style.zIndex = '9999';
+                
+                document.body.appendChild(confetti);
+                
+                const duration = 3000 + Math.random() * 2000;
+                const horizontalMovement = (Math.random() - 0.5) * 200;
+                
+                confetti.animate([
+                    { transform: 'translateY(0) translateX(0) rotate(0deg)', opacity: 1 },
+                    { transform: `translateY(${window.innerHeight}px) translateX(${horizontalMovement}px) rotate(${Math.random() * 360}deg)`, opacity: 0 }
+                ], {
+                    duration: duration,
+                    easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+                });
+                
+                setTimeout(function() {
+                    confetti.remove();
+                }, duration);
+            }
+        }
+    </script>
+</body>
+</html>
